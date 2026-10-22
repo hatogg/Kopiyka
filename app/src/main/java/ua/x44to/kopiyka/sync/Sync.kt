@@ -66,6 +66,8 @@ object Sync {
     private var kick = Channel<Unit>(Channel.CONFLATED)
     @Volatile private var foreground = false
     @Volatile private var phase = Phase.OFF
+    /** поки створюємо чи приєднуємось — бюджет для інтерфейсу ще не спільний */
+    @Volatile private var settingUp = false
 
     val active get() = state.code != null && engine != null
 
@@ -118,10 +120,10 @@ object Sync {
     }
 
     private fun publish(p: Phase = phase) {
-        phase = if (state.code == null) Phase.OFF else p
+        phase = if (state.code == null || settingUp) Phase.OFF else p
         val s = state
         _status.value = Status(
-            phase, s.code, s.name, s.device, s.lastSync, s.pending.size,
+            phase, if (settingUp) null else s.code, s.name, s.device, s.lastSync, s.pending.size,
             s.members.entries.sortedWith(compareBy({ if (it.key == s.device) 0 else 1 }, { it.value.name })).map { it.key to it.value },
         )
     }
@@ -138,15 +140,21 @@ object Sync {
         liveJob = scope.launch { live(e) }
     }
 
-    /** Застосунок згорнули: з'єднання закриваємо, недосланe — доженемо у фоні. */
+    /** Застосунок згорнули: з'єднання закриваємо, недоіслане — доженемо у фоні. */
     @Synchronized
     fun stop() {
         foreground = false
+        halt()
+        val c = app ?: return
+        if (state.pending.isNotEmpty()) flushLater(c)
+    }
+
+    /** Закрити живе з'єднання (позначку «застосунок на екрані» не чіпаємо). */
+    @Synchronized
+    private fun halt() {
         liveJob?.cancel()
         liveJob = null
         engine?.cancel()
-        val c = app ?: return
-        if (state.pending.isNotEmpty()) flushLater(c)
     }
 
     private suspend fun live(e: SyncEngine) = kotlinx.coroutines.coroutineScope {
@@ -227,18 +235,22 @@ object Sync {
     /** Новий спільний бюджет із поточних даних. Повертає код. */
     suspend fun create(name: String): String = withContext(Dispatchers.IO) {
         val c = app ?: error("Sync.init")
-        stop()
+        halt()
         val code = BudgetCode.generate()
         val old = state
+        settingUp = true
         persist(old.copy(code = code, name = name.trim(), known = emptyMap(), pending = emptyMap(), members = emptyMap(), lastSync = 0))
         val e = makeEngine(code)
+        engine = e // правки, зроблені під час завантаження, теж потраплять у чергу
         try {
             e.create()
         } catch (ex: Exception) {
+            engine = null
+            settingUp = false
             persist(old)
             throw ex
         }
-        engine = e
+        settingUp = false
         publish(Phase.ONLINE)
         schedule(c)
         if (foreground) start()
@@ -249,22 +261,26 @@ object Sync {
     suspend fun join(input: String, name: String): Unit = withContext(Dispatchers.IO) {
         val c = app ?: error("Sync.init")
         val code = BudgetCode.normalize(input) ?: throw JoinError(notFound = true)
-        stop()
+        halt()
         try { File(c.filesDir, "before-shared.json").writeText(Store.exportJson()) } catch (_: Exception) {}
         val old = state
+        settingUp = true
         persist(old.copy(code = code, name = name.trim(), known = emptyMap(), pending = emptyMap(), members = emptyMap(), lastSync = 0))
         val e = makeEngine(code)
         val ok = try {
             e.join()
         } catch (ex: Exception) {
+            settingUp = false
             persist(old)
             throw JoinError(notFound = false, ex)
         }
         if (!ok) {
+            settingUp = false
             persist(old)
             throw JoinError(notFound = true)
         }
         engine = e
+        settingUp = false
         publish(Phase.ONLINE)
         schedule(c)
         if (foreground) start()
@@ -272,7 +288,7 @@ object Sync {
 
     /** Вийти зі спільного бюджету: дані лишаються на телефоні, але більше не синхронізуються. */
     fun leave() {
-        stop()
+        halt()
         engine = null
         persist(state.copy(code = null, known = emptyMap(), pending = emptyMap(), members = emptyMap(), lastSync = 0))
         app?.let { schedule(it) }

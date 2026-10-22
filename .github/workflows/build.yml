@@ -33,6 +33,18 @@ jobs:
           chmod +x gradlew
           # тести синхронізації: рушій на підробленому сервері + справжня база Firebase
           KP_LIVE_TESTS=1 ./gradlew testDebugUnitTest assembleRelease --console=plain 2>&1 | tee build.log
+      - name: Unit test summary
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import glob, xml.etree.ElementTree as ET
+          rows = []
+          for f in sorted(glob.glob("app/build/test-results/testDebugUnitTest/*.xml")):
+              r = ET.parse(f).getroot()
+              t, fl, er, sk = (int(r.get(k, 0)) for k in ("tests", "failures", "errors", "skipped"))
+              rows.append(f"{r.get('name').split('.')[-1]}: {t - fl - er - sk} passed, {fl + er} failed, {sk} skipped")
+          print("::notice title=unit tests::" + ("%0A".join(rows) or "no results"))
+          PY
       - name: Why it failed
         if: failure() && steps.build.outcome == 'failure'
         run: python3 .github/annotate.py build.log
