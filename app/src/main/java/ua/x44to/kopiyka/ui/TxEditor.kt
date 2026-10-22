@@ -16,7 +16,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
@@ -27,6 +29,8 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Backspace
@@ -48,7 +52,9 @@ import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -56,8 +62,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -156,6 +167,25 @@ fun TxEditor(d: AppData, r: Route.Edit) {
     var picking by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    // сума з наявної операції «виділена»: перша цифра замінює її, а не дописується в кінець
+    var fresh by remember { mutableStateOf(expr.isNotEmpty()) }
+    var freshTo by remember { mutableStateOf(toExpr.isNotEmpty()) }
+
+    // нотатка й сума не повинні ділити введення: поки пишемо нотатку — цифрову клавіатуру ховаємо,
+    // а дотик до суми закриває системну клавіатуру й знімає фокус із нотатки
+    val focus = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
+    var noteFocused by remember { mutableStateOf(false) }
+    fun backToAmount() {
+        focus.clearFocus(force = true)
+        keyboard?.hide()
+        noteFocused = false
+    }
+    val imeVisible = WindowInsets.isImeVisible
+    LaunchedEffect(imeVisible) {
+        // клавіатуру сховали кнопкою «Назад» — повертаємо цифрову
+        if (!imeVisible && noteFocused) backToAmount()
+    }
 
     androidx.compose.runtime.LaunchedEffect(app.newCategory) {
         val id = app.newCategory ?: return@LaunchedEffect
@@ -189,6 +219,7 @@ fun TxEditor(d: AppData, r: Route.Edit) {
             toAccount = if (type == TxType.TRANSFER) toAccount else null, toAmount = toAmount,
             category = if (type == TxType.TRANSFER) null else category, date = date.toString(), note = note.trim(),
             recurring = recId, created = existing?.created ?: System.currentTimeMillis(),
+            by = existing?.by ?: ua.x44to.kopiyka.sync.Sync.author(),
         )
         Store.saveTx(tx)
         if (repeat && existing == null && recId != null) {
@@ -237,14 +268,15 @@ fun TxEditor(d: AppData, r: Route.Edit) {
         AmountDisplay(
             expr, cur, color, active = !editTo || !crossCurrency,
             sign = when (type) { TxType.EXPENSE -> "−"; TxType.INCOME -> "+"; else -> "" },
-            onClick = { editTo = false },
+            selected = fresh && !(editTo && crossCurrency) && !noteFocused,
+            onClick = { editTo = false; backToAmount() },
         )
         if (crossCurrency) {
             val auto = amount?.let { Money.convert(it, cur, toCur, s) } ?: 0
             Row(
                 Modifier.fillMaxWidth().padding(horizontal = 16.dp).clip(RoundedCornerShape(16.dp))
                     .background(if (editTo) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
-                    .clickable { editTo = true }.padding(horizontal = 12.dp, vertical = 6.dp),
+                    .clickable { editTo = true; backToAmount() }.padding(horizontal = 12.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(t("Зараховано", "Received"), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
@@ -318,16 +350,41 @@ fun TxEditor(d: AppData, r: Route.Edit) {
                 value = note, onValueChange = { note = it.take(200) },
                 placeholder = { Text(t("Нотатка", "Note")) },
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { backToAmount() }),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)
+                    .onFocusChanged { noteFocused = it.isFocused },
             )
         }
 
-        Keypad(
+        if (noteFocused) {
+            // поки пишемо нотатку: замість цифр — «До суми» і «Зберегти» над системною клавіатурою
+            Row(
+                Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainerLow).padding(horizontal = 12.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TextButton(onClick = { backToAmount() }, modifier = Modifier.weight(1f).height(48.dp)) {
+                    Text(t("До суми", "Amount"), style = MaterialTheme.typography.titleMedium)
+                }
+                Button(onClick = { backToAmount(); save() }, modifier = Modifier.weight(1f).height(48.dp), shape = RoundedCornerShape(16.dp)) {
+                    Icon(Icons.Rounded.Check, null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(t("Зберегти", "Save"), style = MaterialTheme.typography.titleMedium)
+                }
+            }
+        } else Keypad(
             onKey = { k ->
                 error = null
-                if (editTo && crossCurrency) toExpr = keypadPress(toExpr, k) else expr = keypadPress(expr, k)
+                val replace = k.isDigit() || k == ','
+                if (editTo && crossCurrency) {
+                    toExpr = keypadPress(if (freshTo && replace) "" else toExpr, k)
+                    freshTo = false
+                } else {
+                    expr = keypadPress(if (fresh && replace) "" else expr, k)
+                    fresh = false
+                }
             },
-            onClear = { if (editTo && crossCurrency) toExpr = "" else expr = "" },
+            onClear = { if (editTo && crossCurrency) { toExpr = ""; freshTo = false } else { expr = ""; fresh = false } },
             onSave = { save() },
         )
     }
@@ -347,7 +404,7 @@ fun TxEditor(d: AppData, r: Route.Edit) {
 }
 
 @Composable
-private fun AmountDisplay(expr: String, cur: String, color: Color, active: Boolean, sign: String, onClick: () -> Unit) {
+private fun AmountDisplay(expr: String, cur: String, color: Color, active: Boolean, sign: String, selected: Boolean, onClick: () -> Unit) {
     val result = Money.eval(expr)
     val hasOps = expr.any { it in OPS }
     Column(
@@ -357,11 +414,19 @@ private fun AmountDisplay(expr: String, cur: String, color: Color, active: Boole
     ) {
         val text = (if (expr.isEmpty() || hasOps) "" else sign) + prettyExpr(expr)
         Row(verticalAlignment = Alignment.Bottom) {
+            // довга сума зменшує шрифт, а не обрізається «…» (інакше здається, що число неправильне)
+            val size = when {
+                text.length <= 9 -> 46.sp
+                text.length <= 12 -> 38.sp
+                text.length <= 16 -> 30.sp
+                else -> 24.sp
+            }
             Text(
-                text, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                fontSize = if (text.length > 12) 34.sp else 46.sp, fontWeight = FontWeight.SemiBold,
+                text, maxLines = 1, softWrap = false,
+                fontSize = size, fontWeight = FontWeight.SemiBold,
                 color = if (expr.isEmpty()) MaterialTheme.colorScheme.outline else if (active) color else MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.weight(1f, fill = false),
+                modifier = Modifier.weight(1f, fill = false)
+                    .then(if (selected) Modifier.clip(RoundedCornerShape(10.dp)).background(MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)).padding(horizontal = 6.dp) else Modifier),
             )
             Spacer(Modifier.width(8.dp))
             Text(Money.symbol(cur), fontSize = 28.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 6.dp))

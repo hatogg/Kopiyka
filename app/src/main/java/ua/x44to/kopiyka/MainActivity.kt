@@ -66,11 +66,13 @@ import ua.x44to.kopiyka.ui.RatesScreen
 import ua.x44to.kopiyka.ui.RecurringEditScreen
 import ua.x44to.kopiyka.ui.RecurringsScreen
 import ua.x44to.kopiyka.ui.Route
+import ua.x44to.kopiyka.ui.SharedScreen
 import ua.x44to.kopiyka.ui.StatsScreen
 import ua.x44to.kopiyka.ui.Tabs
 import ua.x44to.kopiyka.ui.TxEditor
 import ua.x44to.kopiyka.ui.TxListScreen
 import ua.x44to.kopiyka.ui.isDark
+import ua.x44to.kopiyka.sync.Sync
 import ua.x44to.kopiyka.work.Notify
 
 class MainActivity : ComponentActivity() {
@@ -79,6 +81,7 @@ class MainActivity : ComponentActivity() {
         Store.init(applicationContext)
         Store.processRecurring()
         try { Notify.schedule(applicationContext) } catch (_: Exception) {}
+        try { Sync.schedule(applicationContext) } catch (_: Exception) {}
         if (savedInstanceState == null) handle(intent)
         setContent {
             val data by Store.data.collectAsStateWithLifecycle()
@@ -102,6 +105,16 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         Store.processRecurring()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        Sync.start() // спільний бюджет: живе з'єднання, поки застосунок на екрані
+    }
+
+    override fun onStop() {
+        super.onStop()
+        Sync.stop()
     }
 
     /** Віджет і ярлики відкривають застосунок одразу на додаванні: kopiyka://add/expense. */
@@ -231,6 +244,7 @@ private fun Layer(d: AppData, e: Entry) {
             is Route.GoalEdit -> GoalEditScreen(d, r)
             Route.Rates -> RatesScreen(d)
             Route.Backup -> BackupScreen(d)
+            Route.Shared -> SharedScreen(d)
         }
     }
 }

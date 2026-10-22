@@ -28,6 +28,7 @@ sealed interface Route {
     data class GoalEdit(val id: String?) : Route
     data object Rates : Route
     data object Backup : Route
+    data object Shared : Route
 }
 
 class Entry(val id: Long, val route: Route)

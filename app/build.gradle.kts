@@ -13,8 +13,13 @@ android {
         applicationId = "ua.x44to.kopiyka"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1"
+        // База спільного бюджету (Firebase Realtime Database). Свою можна задати властивістю
+        // -Pkopiyka.syncUrl=... або змінною KP_SYNC_URL; правила бази — у database.rules.json.
+        val syncUrl = (project.findProperty("kopiyka.syncUrl") as String?) ?: System.getenv("KP_SYNC_URL")
+            ?: "https://kopiyka-79971-default-rtdb.europe-west1.firebasedatabase.app"
+        buildConfigField("String", "SYNC_URL", "\"$syncUrl\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -50,6 +55,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -69,6 +75,8 @@ dependencies {
     // щоденна перевірка регулярних платежів, навіть коли застосунок закритий
     implementation("androidx.work:work-runtime-ktx:2.10.0")
 
+    // перевірка синхронізації на звичайній JVM (два «телефони» й справжня база)
+    testImplementation("junit:junit:4.13.2")
     // скриншоти для README: застосунок проходить екрани в емуляторі (.github/workflows/screenshots.yml)
     androidTestImplementation(composeBom)
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")

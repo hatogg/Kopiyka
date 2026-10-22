@@ -122,6 +122,8 @@ fun TxRow(d: AppData, tx: Tx, showDate: Boolean = false, onClick: () -> Unit) {
             val sub = listOfNotNull(
                 tx.note.takeIf { it.isNotBlank() },
                 if (tx.type != TxType.TRANSFER) acc?.name else null,
+                // спільний бюджет: хто додав (свої операції не підписуємо)
+                tx.by?.takeIf { ua.x44to.kopiyka.sync.Sync.active && it != ua.x44to.kopiyka.sync.Sync.author() },
                 if (showDate) L.shortDate(LocalDate.parse(tx.date)) else null,
             ).joinToString(" · ")
             if (sub.isNotEmpty()) Text(

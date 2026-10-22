@@ -18,6 +18,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import ua.x44to.kopiyka.MainActivity
 import ua.x44to.kopiyka.R
+import ua.x44to.kopiyka.sync.Sync
 import ua.x44to.kopiyka.data.Calc
 import ua.x44to.kopiyka.data.L
 import ua.x44to.kopiyka.data.Money
@@ -75,6 +76,8 @@ object Notify {
     /** Додає настали автоплатежі й нагадує про ті, що треба сплатити вручну. */
     fun run(c: Context) {
         Store.init(c)
+        // спільний бюджет: спершу забираємо зміни інших, щоб не додати вже сплачений ними платіж
+        if (Sync.active) Sync.syncOnceBlocking()
         val added = Store.processRecurring()
         val d = Store.data.value
         if (!d.settings.notifications) return

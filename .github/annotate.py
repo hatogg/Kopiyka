@@ -19,6 +19,9 @@ for m in re.finditer(r"^e: (?:file://)?(/[^:]+):(\d+):(\d+) (.+)$", log, re.M):
     out.append(f"::error file={esc(path.replace(root, ''), True)},line={line},col={col}::{esc(msg)}")
 for m in re.finditer(r"^(?:ERROR|AAPT: error|error): (.+)$", log, re.M):
     out.append(f"::error title=build::{esc(m.group(1)[:600])}")
+# упалі юніт-тести: «SyncEngineTest > twoPhones FAILED» і кілька рядків причини під ним
+for m in re.finditer(r"^(\S+ > .+ FAILED)\n((?:[ \t]+.+\n?){1,8})", log, re.M):
+    out.append(f"::error title={esc(m.group(1)[:200], True)}::{esc(m.group(2).strip()[:1200])}")
 w = re.search(r"\* What went wrong:\n(.+?)(?:\n\* Try:|\Z)", log, re.S)
 if w:
     out.append(f"::error title=What went wrong::{esc(w.group(1).strip()[-1500:])}")

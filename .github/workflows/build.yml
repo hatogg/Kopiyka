@@ -31,18 +31,20 @@ jobs:
         run: |
           set -o pipefail
           chmod +x gradlew
-          ./gradlew assembleRelease --console=plain 2>&1 | tee build.log
+          # тести синхронізації: рушій на підробленому сервері + справжня база Firebase
+          KP_LIVE_TESTS=1 ./gradlew testDebugUnitTest assembleRelease --console=plain 2>&1 | tee build.log
       - name: Why it failed
         if: failure() && steps.build.outcome == 'failure'
         run: python3 .github/annotate.py build.log
       - name: Keep the full log in the ci-log branch
         if: failure() && steps.build.outcome == 'failure' && github.event_name != 'pull_request'
         run: |
-          mkdir /tmp/log && cp build.log /tmp/log/ && cd /tmp/log
+          mkdir /tmp/log && cp build.log /tmp/log/ && cp -r app/build/test-results /tmp/log/ 2>/dev/null || true
+          cd /tmp/log
           git init -q -b ci-log
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add build.log && git commit -qm "build log for ${{ github.sha }}"
+          git add -A && git commit -qm "build log for ${{ github.sha }}"
           git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" ci-log
       - name: Name the file
         id: v
@@ -51,12 +53,13 @@ jobs:
           echo "name=$v" >> "$GITHUB_OUTPUT"
           cp app/build/outputs/apk/release/app-release.apk "Kopiyka-$v.apk"
           ls -la Kopiyka-*.apk
-      - name: No internet permission (the README promises it)
+      - name: No permissions beyond what the README lists
         run: |
           aapt2="$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)aapt2"
           "$aapt2" dump permissions "Kopiyka-${{ steps.v.outputs.name }}.apk" | tee perms.txt
-          if grep -q "android.permission.INTERNET" perms.txt; then
-            echo "::error title=privacy::The APK requests android.permission.INTERNET"
+          # інтернет — лише для спільного бюджету; контакти, місце, камера, пам'ять, реклама — ніколи
+          if grep -E "CONTACTS|LOCATION|CAMERA|RECORD_AUDIO|SMS|PHONE_STATE|CALL_LOG|EXTERNAL_STORAGE|MEDIA_|AD_ID|ACCOUNTS" perms.txt; then
+            echo "::error title=privacy::The APK requests a permission the README doesn't mention"
             exit 1
           fi
       - uses: actions/upload-artifact@v7

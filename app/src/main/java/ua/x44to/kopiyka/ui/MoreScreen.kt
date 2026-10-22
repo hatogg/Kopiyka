@@ -37,6 +37,7 @@ import androidx.compose.material.icons.rounded.DarkMode
 import androidx.compose.material.icons.rounded.DeleteForever
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Event
+import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Palette
@@ -71,7 +72,9 @@ import ua.x44to.kopiyka.data.Money
 import ua.x44to.kopiyka.data.Store
 import ua.x44to.kopiyka.data.TxType
 import ua.x44to.kopiyka.data.t
+import ua.x44to.kopiyka.sync.Sync
 import ua.x44to.kopiyka.work.Notify
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import java.time.LocalDate
 
 @Composable
@@ -85,6 +88,7 @@ fun MoreScreen(d: AppData, padding: PaddingValues) {
         Store.settings { it.copy(notifications = ok, notifAsked = true) }
         if (!ok) app.toast(t("Без дозволу сповіщення не приходитимуть", "Notifications need permission"))
     }
+    val sync by Sync.status.collectAsStateWithLifecycle()
     val activeAcc = d.accounts.filter { !it.archived }
     val total = remember(d) { Calc.total(d) }
     val recActive = d.recurring.filter { it.active }
@@ -95,6 +99,17 @@ fun MoreScreen(d: AppData, padding: PaddingValues) {
 
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + 24.dp)) {
         item { Text(t("Ще", "More"), style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(start = 20.dp, top = 12.dp, bottom = 8.dp)) }
+        item {
+            val others = sync.members.filter { it.first != sync.device }.map { it.second.name }
+            SoftCard(color = if (sync.code != null) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerLow) {
+                MenuRow(
+                    Icons.Rounded.Groups,
+                    if (sync.code != null && others.isNotEmpty()) t("Спільний бюджет з: ", "Shared with: ") + others.joinToString(", ")
+                    else t("Спільний бюджет", "Shared budget"),
+                    syncLine(sync), { app.push(Route.Shared) },
+                )
+            }
+        }
         item {
             SoftCard {
                 MenuRow(
@@ -170,8 +185,8 @@ fun MoreScreen(d: AppData, padding: PaddingValues) {
                 MenuRow(
                     Icons.Rounded.Info, t("Копійка", "Kopiyka") + if (version.isNotEmpty()) " $version" else "",
                     t(
-                        "Без інтернету й реклами. Усі дані зберігаються лише на вашому телефоні.",
-                        "No internet, no ads. All data stays on your phone.",
+                        "Без реклами й реєстрації. Дані зберігаються на телефоні; для спільного бюджету — ще й на сервері, зашифровані кодом.",
+                        "No ads, no sign-up. Data stays on your phone; a shared budget is also kept on a server, encrypted with its code.",
                     ),
                 )
             }
@@ -381,9 +396,11 @@ fun BackupScreen(d: AppData) {
     val pending = restoreText
     if (pending != null) Confirm(
         t("Відновити з копії?", "Restore from backup?"),
-        t("Усі поточні рахунки, операції, бюджети й цілі буде замінено даними з файлу.", "All current accounts, transactions, budgets and goals will be replaced with the file's data."),
+        t("Усі поточні рахунки, операції, бюджети й цілі буде замінено даними з файлу.", "All current accounts, transactions, budgets and goals will be replaced with the file's data.") +
+            if (Sync.active) t(" Спільний бюджет на цьому телефоні буде вимкнено — в інших учасників нічого не зміниться.", " The shared budget will be turned off on this phone — nothing changes for the others.") else "",
         t("Відновити", "Restore"),
         onConfirm = {
+            if (Sync.active) Sync.leave() // інакше відновлення з копії перезаписало б бюджет усім учасникам
             val err = Store.importJson(pending)
             app.toast(err ?: t("Дані відновлено", "Data restored"))
         },
@@ -391,9 +408,10 @@ fun BackupScreen(d: AppData) {
     )
     if (resetDialog) Confirm(
         t("Видалити всі дані?", "Delete all data?"),
-        t("Операції, рахунки, бюджети й цілі зникнуть назавжди. Спершу краще зберегти копію.", "Transactions, accounts, budgets and goals will be gone for good. Save a backup first."),
+        t("Операції, рахунки, бюджети й цілі зникнуть назавжди. Спершу краще зберегти копію.", "Transactions, accounts, budgets and goals will be gone for good. Save a backup first.") +
+            if (Sync.active) t(" Спільний бюджет на цьому телефоні буде вимкнено — в інших учасників дані залишаться.", " The shared budget will be turned off on this phone — the others keep their data.") else "",
         t("Видалити все", "Delete everything"),
-        onConfirm = { Store.reset(); app.toast(t("Усе видалено", "Everything deleted")) },
+        onConfirm = { if (Sync.active) Sync.leave(); Store.reset(); app.toast(t("Усе видалено", "Everything deleted")) },
         onDismiss = { resetDialog = false },
     )
 }

@@ -1,0 +1,15 @@
+{
+  "rules": {
+    "b": {
+      "$bid": {
+        ".read": "$bid.matches(/^[0-9a-f]{32}$/)",
+        ".write": "$bid.matches(/^[0-9a-f]{32}$/)",
+        "r": {
+          "$key": {
+            ".validate": "newData.child('t').isNumber() && (!newData.hasChild('d') || (newData.child('d').isString() && newData.child('d').val().length < 20000))"
+          }
+        }
+      }
+    }
+  }
+}

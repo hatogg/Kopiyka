@@ -1,8 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Лише сповіщення про регулярні платежі й бюджети. Інтернету застосунок не просить. -->
+    <!-- Сповіщення про регулярні платежі й бюджети. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Інтернет — лише для спільного бюджету (зашифровані записи в Firebase). Без нього все працює як раніше. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <application
         android:allowBackup="true"

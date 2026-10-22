@@ -56,6 +56,8 @@ data class Tx(
     /** якщо створено регулярним платежем */
     val recurring: String? = null,
     val created: Long = 0,
+    /** хто додав (ім'я учасника спільного бюджету) */
+    val by: String? = null,
 )
 
 @Serializable

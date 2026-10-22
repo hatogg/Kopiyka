@@ -1,7 +1,13 @@
 package ua.x44to.kopiyka
 
 import android.graphics.Bitmap
+import android.util.Log
+import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.performImeAction
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.isSelectable
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -28,6 +34,12 @@ import ua.x44to.kopiyka.data.Store
 import ua.x44to.kopiyka.data.Tx
 import ua.x44to.kopiyka.data.TxType
 import ua.x44to.kopiyka.data.t
+import ua.x44to.kopiyka.sync.BudgetCode
+import ua.x44to.kopiyka.sync.FirebaseRemote
+import ua.x44to.kopiyka.sync.LocalData
+import ua.x44to.kopiyka.sync.Sync
+import ua.x44to.kopiyka.sync.SyncEngine
+import ua.x44to.kopiyka.sync.SyncState
 import java.io.File
 import java.io.FileOutputStream
 import java.time.LocalDate
@@ -63,6 +75,7 @@ class ScreenshotTest {
                 last(t("Кафе й ресторани", "Cafes & restaurants"))
                 settle()
                 shot("$lang-light-add")
+                noteCheck(lang)
                 compose.onNodeWithContentDescription(t("Закрити", "Close")).performClick()
                 settle()
                 tab(t("Операції", "History"))
@@ -80,6 +93,7 @@ class ScreenshotTest {
                 tab(t("Ще", "More"))
                 settle()
                 shot("$lang-light-more")
+                if (Sync.configured) sharedFlow(lang)
                 last(t("Регулярні платежі", "Recurring payments"))
                 settle()
                 shot("$lang-light-recurring")
@@ -117,6 +131,122 @@ class ScreenshotTest {
         }
         shell("cmd uimode night no")
         L.override = null
+    }
+
+    /**
+     * Регресія бага «натискаю на суму — пише в коментар»: поки пишемо нотатку, цифрової клавіатури немає;
+     * дотик до суми повертає її, і цифри йдуть у суму, а нотатка лишається як була.
+     */
+    private fun noteCheck(lang: String) {
+        val note = t("Кава з колегами", "Coffee with colleagues")
+        compose.onNode(hasSetTextAction()).performClick()
+        settle()
+        compose.onNode(hasSetTextAction()).performTextInput(note)
+        settle()
+        shot("$lang-light-add-note")
+        if (compose.onAllNodesWithText("÷", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty())
+            throw AssertionError("цифрова клавіатура не сховалась, поки пишемо нотатку")
+        compose.onAllNodesWithText("250 + 80", useUnmergedTree = true).onFirst().performClick()
+        settle()
+        key("5")
+        settle()
+        if (compose.onAllNodesWithText("250 + 805", useUnmergedTree = true).fetchSemanticsNodes().isEmpty())
+            throw AssertionError("після дотику до суми цифра не потрапила в суму")
+        compose.onNode(hasSetTextAction()).assert(hasText(note))
+        Log.d("Kopiyka", "note check ok")
+    }
+
+    /**
+     * Спільний бюджет через справжню базу: застосунок створює бюджет, «другий телефон» (рушій синхронізації
+     * прямо в тесті) приєднується за кодом і додає витрату — вона має з'явитися в застосунку за кілька секунд.
+     */
+    private fun sharedFlow(lang: String) {
+        last(t("Спільний бюджет", "Shared budget"))
+        settle()
+        compose.onAllNodes(hasSetTextAction()).onFirst().performTextInput(t("Оля", "Olivia"))
+        compose.onAllNodes(hasSetTextAction()).onFirst().performImeAction()
+        settle()
+        shot("$lang-light-shared-setup")
+        last(t("Створити спільний бюджет", "Create a shared budget"))
+        val t0 = System.currentTimeMillis()
+        waitFor("бюджет створено") { Sync.status.value.code != null }
+        val code = Sync.status.value.code!!
+        Log.d("Kopiyka", "created in ${System.currentTimeMillis() - t0} ms")
+
+        val partner = Partner(code, t("Андрій", "Andrew"))
+        try {
+            check(partner.engine.join()) { "другий телефон не знайшов бюджет" }
+            val missing = Store.data.value.txs.count { s -> partner.data.txs.none { it.id == s.id } }
+            check(missing == 0) { "другому телефону не дійшло $missing з ${Store.data.value.txs.size} операцій" }
+            Log.d("Kopiyka", "partner joined with ${partner.data.txs.size} transactions")
+            val tx = Tx(
+                "partner-${System.currentTimeMillis()}", TxType.EXPENSE, if (L.ukr) 18_500 else 1_850, "cash", category = "food",
+                date = LocalDate.now().toString(), note = t("Овочі на ринку", "Farmers market"), created = System.currentTimeMillis(), by = partner.name,
+            )
+            val t1 = System.currentTimeMillis()
+            partner.add(tx)
+            waitFor("операція другого телефона з'явилась у застосунку") { Store.data.value.txs.any { it.id == tx.id } }
+            Log.d("Kopiyka", "partner tx arrived in ${System.currentTimeMillis() - t1} ms")
+            waitFor("обидва учасники") { Sync.status.value.members.size >= 2 }
+
+            // і навпаки: витрата з застосунку доходить до другого телефона
+            val mine = Tx("mine-${System.currentTimeMillis()}", TxType.EXPENSE, if (L.ukr) 9_500 else 450, "card", category = "cafe", date = LocalDate.now().toString(), by = Sync.author())
+            Store.saveTx(mine)
+            partner.listenFor(20_000) { partner.data.txs.any { it.id == mine.id } }
+            settle()
+            shot("$lang-light-shared")
+            compose.onNodeWithContentDescription(t("Назад", "Back")).performClick()
+            settle()
+            tab(t("Операції", "History"))
+            settle()
+            shot("$lang-light-shared-history")
+            tab(t("Ще", "More"))
+            settle()
+        } finally {
+            Sync.leave()
+            runCatching { partner.remote.wipe() }
+        }
+    }
+
+    private fun waitFor(what: String, ms: Long = 30_000, ok: () -> Boolean) {
+        val t0 = System.currentTimeMillis()
+        while (!ok()) {
+            if (System.currentTimeMillis() - t0 > ms) throw AssertionError("не дочекались: $what")
+            Thread.sleep(200)
+        }
+    }
+
+    /** «Другий телефон»: власні дані в пам'яті й той самий рушій синхронізації, що в застосунку. */
+    private class Partner(code: String, val name: String) {
+        @Volatile var data = AppData()
+        val remote = FirebaseRemote(Sync.server, BudgetCode.budgetId(code), Sync.namespace)
+        private val local = object : LocalData {
+            override val data get() = this@Partner.data
+            override fun mutateRemote(transform: (AppData) -> AppData) {
+                synchronized(this@Partner) { this@Partner.data = transform(this@Partner.data) }
+            }
+        }
+        val engine = SyncEngine(remote, code, local, SyncState(code = code, device = "partner-test", name = name))
+
+        fun add(tx: Tx) {
+            synchronized(this) {
+                val p = data
+                data = data.copy(txs = data.txs + tx)
+                engine.localChanged(p, data)
+            }
+            engine.push()
+        }
+
+        /** Послухати сервер, доки не виконається умова. */
+        fun listenFor(ms: Long, ok: () -> Boolean) {
+            val t0 = System.currentTimeMillis()
+            val th = Thread { runCatching { engine.listen({ ok() || System.currentTimeMillis() - t0 > ms }) } }
+            th.start()
+            while (!ok() && System.currentTimeMillis() - t0 < ms) Thread.sleep(200)
+            engine.cancel()
+            th.join(5_000)
+            if (!ok()) throw AssertionError("витрата з застосунку не дійшла до другого телефона")
+        }
     }
 
     /** Клавіша калькулятора: вона в найвищому шарі, тож беремо останній збіг. */

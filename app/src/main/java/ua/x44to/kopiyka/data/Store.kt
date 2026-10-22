@@ -9,13 +9,14 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
+import ua.x44to.kopiyka.sync.Sync
 import ua.x44to.kopiyka.widget.BalanceWidget
 import ua.x44to.kopiyka.work.Notify
 import java.io.File
 import java.time.LocalDate
 import java.util.UUID
 
-/** Усі дані — один JSON-файл у пам'яті застосунку. Читаємо й пишемо цілком; інтернет не потрібен. */
+/** Усі дані — один JSON-файл у пам'яті застосунку. Читаємо й пишемо цілком; спільний бюджет синхронізується окремо (sync/). */
 object Store {
     private val json = Json {
         ignoreUnknownKeys = true
@@ -47,14 +48,29 @@ object Store {
             Defaults.data()
         }
         if (!f.exists()) save(_data.value)
+        Sync.init(c)
     }
 
+    /**
+     * Спостерігач локальних змін (синхронізація спільного бюджету): отримує стан до й після.
+     * Викликається під замком сховища — порядок замків «сховище → синхронізація».
+     */
+    @Volatile
+    var onLocalChange: ((AppData, AppData) -> Unit)? = null
+
+    fun update(transform: (AppData) -> AppData) = commit(false, transform)
+
+    /** Зміни, що прийшли від інших учасників: зберегти й показати, але не надсилати назад. */
+    fun mutateRemote(transform: (AppData) -> AppData) = commit(true, transform)
+
     @Synchronized
-    fun update(transform: (AppData) -> AppData) {
-        val next = transform(_data.value)
-        if (next === _data.value) return
+    private fun commit(remote: Boolean, transform: (AppData) -> AppData) {
+        val prev = _data.value
+        val next = transform(prev)
+        if (next === prev) return
         _data.value = next
         save(next)
+        if (!remote) try { onLocalChange?.invoke(prev, next) } catch (_: Exception) {}
         val c = app ?: return
         scope.launch {
             try { BalanceWidget().updateAll(c) } catch (_: Exception) {}
@@ -160,8 +176,10 @@ object Store {
             val to = d.account(r.toAccount)?.currency ?: d.settings.base
             if (from != to) Money.convert(amount, from, to, d.settings) else null
         } else null
+        // id повтору однаковий на всіх телефонах спільного бюджету: якщо двоє додадуть той самий платіж,
+        // це буде один запис, а не дубль
         return Tx(
-            id = newId(), type = r.type, amount = amount, account = r.account, toAccount = r.toAccount, toAmount = toAmount,
+            id = "${r.id}_${r.n}", type = r.type, amount = amount, account = r.account, toAccount = r.toAccount, toAmount = toAmount,
             category = if (r.type == TxType.TRANSFER) null else r.category, date = date.toString(), note = r.note,
             recurring = r.id, created = System.currentTimeMillis(),
         )
@@ -189,7 +207,8 @@ object Store {
         }
         if (added.isEmpty()) return added
         val before = d0
-        update { d -> d.copy(txs = d.txs + added.map { it.second }, recurring = newRec) }
+        val ids = added.mapTo(HashSet()) { it.second.id }
+        update { d -> d.copy(txs = d.txs.filter { it.id !in ids } + added.map { it.second }, recurring = newRec) }
         if (added.any { it.second.type == TxType.EXPENSE }) budgetAlerts(before, _data.value)
         return added
     }
@@ -201,7 +220,7 @@ object Store {
         val today = LocalDate.now()
         val tx = txFrom(r, if (date.isAfter(today)) today else date, amount ?: r.amount)
         val before = _data.value
-        update { d -> d.copy(txs = d.txs + tx, recurring = d.recurring.map { if (it.id == id) it.copy(n = it.n + 1) else it }) }
+        update { d -> d.copy(txs = d.txs.filter { it.id != tx.id } + tx, recurring = d.recurring.map { if (it.id == id) it.copy(n = it.n + 1) else it }) }
         if (tx.type == TxType.EXPENSE) budgetAlerts(before, _data.value)
     }
 
