@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Монета-копійка зі знаком гривні -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- тінь -->
+    <path
+        android:fillColor="#33000000"
+        android:pathData="M56,57m-27,0a27,27 0,1 1,54 0a27,27 0,1 1,-54 0" />
+    <!-- монета -->
+    <path
+        android:fillColor="#FFE0A526"
+        android:pathData="M54,54m-27,0a27,27 0,1 1,54 0a27,27 0,1 1,-54 0" />
+    <path
+        android:fillColor="#FFFFC857"
+        android:pathData="M54,54m-22.5,0a22.5,22.5 0,1 1,45 0a22.5,22.5 0,1 1,-45 0" />
+    <!-- знак гривні -->
+    <path
+        android:pathData="M46.5,45.5C46.5,42.2 49.6,40.5 54,40.5C58.4,40.5 61.5,42.6 61.5,46C61.5,51.5 46.5,55.5 46.5,61.5C46.5,65 49.8,67.5 54.2,67.5C58.6,67.5 61.5,65.4 61.5,62.4"
+        android:strokeWidth="4"
+        android:strokeColor="#FF7A4B00"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M44,51.2H64M44,57.4H64"
+        android:strokeWidth="3.4"
+        android:strokeColor="#FF7A4B00"
+        android:strokeLineCap="round" />
+</vector>

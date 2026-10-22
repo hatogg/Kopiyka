@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Копійка</string>
+    <string name="widget_name">Копійка: баланс</string>
+    <string name="widget_desc">Баланс, витрати за сьогодні й кнопки швидкого додавання</string>
+    <string name="sc_expense">Витрата</string>
+    <string name="sc_income">Дохід</string>
+    <string name="sc_expense_long">Додати витрату</string>
+    <string name="sc_income_long">Додати дохід</string>
+</resources>

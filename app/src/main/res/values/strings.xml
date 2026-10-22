@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Kopiyka</string>
+    <string name="widget_name">Kopiyka: balance</string>
+    <string name="widget_desc">Balance, today\'s spending and quick-add buttons</string>
+    <string name="sc_expense">Expense</string>
+    <string name="sc_income">Income</string>
+    <string name="sc_expense_long">Add an expense</string>
+    <string name="sc_income_long">Add income</string>
+</resources>

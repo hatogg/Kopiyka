@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_sc_expense"
+        android:shortcutId="expense"
+        android:shortcutLongLabel="@string/sc_expense_long"
+        android:shortcutShortLabel="@string/sc_expense">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="kopiyka://add/expense"
+            android:targetClass="ua.x44to.kopiyka.MainActivity"
+            android:targetPackage="ua.x44to.kopiyka" />
+    </shortcut>
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_sc_income"
+        android:shortcutId="income"
+        android:shortcutLongLabel="@string/sc_income_long"
+        android:shortcutShortLabel="@string/sc_income">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="kopiyka://add/income"
+            android:targetClass="ua.x44to.kopiyka.MainActivity"
+            android:targetPackage="ua.x44to.kopiyka" />
+    </shortcut>
+</shortcuts>
