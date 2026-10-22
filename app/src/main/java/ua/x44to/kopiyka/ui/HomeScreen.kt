@@ -161,13 +161,18 @@ fun HomeScreen(d: AppData, padding: PaddingValues) {
                     Column(Modifier.padding(20.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
-                                val over = bs.leftToday < 0
+                                val monthOver = bs.left < 0
+                                val over = monthOver || bs.leftToday < 0
                                 Text(
-                                    if (over) t("Сьогодні вже понад ліміт", "Over today's limit") else t("Сьогодні можна ще", "Left for today"),
+                                    when {
+                                        monthOver -> t("Бюджет місяця перевищено на", "Monthly budget exceeded by")
+                                        over -> t("Сьогодні понад денний ліміт на", "Over today's limit by")
+                                        else -> t("Сьогодні можна ще", "Left for today")
+                                    },
                                     style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                                 Text(
-                                    Money.format(if (over) -bs.leftToday else bs.leftToday, s.base, hide = hide),
+                                    Money.format(if (monthOver) -bs.left else if (over) -bs.leftToday else bs.leftToday, s.base, hide = hide),
                                     style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold,
                                     color = if (over) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
                                 )

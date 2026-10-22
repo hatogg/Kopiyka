@@ -167,7 +167,7 @@ private fun MainTabs(d: AppData, app: AppState) {
         Triple(Tabs.HOME, Icons.Rounded.Home, t("Огляд", "Overview")),
         Triple(Tabs.TXS, Icons.Rounded.Receipt, t("Операції", "History")),
         Triple(Tabs.BUDGETS, Icons.Rounded.PieChart, t("Бюджети", "Budgets")),
-        Triple(Tabs.STATS, Icons.Rounded.BarChart, t("Статистика", "Stats")),
+        Triple(Tabs.STATS, Icons.Rounded.BarChart, t("Звіти", "Stats")),
         Triple(Tabs.MORE, Icons.Rounded.MoreHoriz, t("Ще", "More")),
     )
     Scaffold(

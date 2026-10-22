@@ -258,7 +258,7 @@ fun TxEditor(d: AppData, r: Route.Edit) {
             if (type != TxType.TRANSFER) {
                 LazyHorizontalGrid(
                     rows = GridCells.Fixed(2),
-                    modifier = Modifier.fillMaxWidth().height(184.dp),
+                    modifier = Modifier.fillMaxWidth().height(204.dp),
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp),

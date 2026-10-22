@@ -74,7 +74,7 @@ class ScreenshotTest {
                 last(t("Цілі накопичення", "Savings goals"))
                 settle()
                 shot("$lang-light-goals")
-                tab(t("Статистика", "Stats"))
+                tab(t("Звіти", "Stats"))
                 settle()
                 shot("$lang-light-stats")
                 tab(t("Ще", "More"))
@@ -100,7 +100,7 @@ class ScreenshotTest {
                 tab(t("Бюджети", "Budgets"))
                 settle()
                 shot("$lang-dark-budgets")
-                tab(t("Статистика", "Stats"))
+                tab(t("Звіти", "Stats"))
                 settle()
                 shot("$lang-dark-stats")
                 Launch.add.value = TxType.EXPENSE
@@ -163,7 +163,7 @@ class ScreenshotTest {
         val today = LocalDate.now()
         val accounts = listOf(
             Account("card", t("Картка", "Debit card"), AccType.CARD, base, m(14_200.0), 0xFF1E88E5),
-            Account("cash", t("Готівка", "Cash"), AccType.CASH, base, m(2_300.0), 0xFF43A047),
+            Account("cash", t("Готівка", "Cash"), AccType.CASH, base, m(4_300.0), 0xFF43A047),
             Account("jar", t("Скарбничка", "Savings jar"), AccType.SAVINGS, base, m(9_000.0), 0xFF00897B),
             Account("usd", if (uk) "Долари" else "Euro", AccType.CASH, if (uk) "USD" else "EUR", 60_000, 0xFF6D4C41),
         )
@@ -178,10 +178,13 @@ class ScreenshotTest {
         for (ago in 0..75) {
             val d = today.minusDays(ago.toLong())
             val dom = d.dayOfMonth
-            if (ago % 2 == 0 || rnd.nextInt(4) == 0) add(ago, TxType.EXPENSE, r(160, 980), "food", listOf(t("Супермаркет", "Supermarket"), t("Ринок", "Market"), "", "")[rnd.nextInt(4)], if (rnd.nextInt(3) == 0) "cash" else "card")
+            if (ago % 2 == 0 || rnd.nextInt(5) == 0) add(ago, TxType.EXPENSE, r(150, 720), "food", listOf(t("Супермаркет", "Supermarket"), t("Ринок", "Market"), "", "")[rnd.nextInt(4)], if (rnd.nextInt(4) == 0) "cash" else "card")
             if (rnd.nextInt(7) < 2) add(ago, TxType.EXPENSE, r(95, 520), "cafe", listOf(t("Кава", "Coffee"), t("Обід", "Lunch"), t("Піца з друзями", "Pizza with friends"))[rnd.nextInt(3)])
-            if (rnd.nextInt(7) < 3) add(ago, TxType.EXPENSE, if (rnd.nextBoolean()) 16.0 else r(140, 290), "transport", if (rnd.nextBoolean()) t("Метро", "Metro") else t("Таксі", "Taxi"))
-            if (d.dayOfWeek.value == 6) add(ago, TxType.EXPENSE, r(1300, 1750), "car", t("Пальне", "Fuel"))
+            if (rnd.nextInt(7) < 3) {
+                if (rnd.nextInt(3) > 0) add(ago, TxType.EXPENSE, 16.0, "transport", t("Метро", "Metro"), "cash")
+                else add(ago, TxType.EXPENSE, r(140, 290), "transport", t("Таксі", "Taxi"))
+            }
+            if (d.dayOfWeek.value == 6 && (ago / 7) % 2 == 0) add(ago, TxType.EXPENSE, r(1300, 1750), "car", t("Пальне", "Fuel"))
             if (d.dayOfWeek.value == 1) add(ago, TxType.EXPENSE, r(200, 500), "donate", t("Збір на дрони", "Fundraiser"))
             if (dom == 5) add(ago, TxType.EXPENSE, 250.0, "phone", t("Інтернет", "Internet"), rec = "r_net")
             if (dom == 12) add(ago, TxType.EXPENSE, 279.0, "subs", "Netflix", rec = "r_netflix")
@@ -190,7 +193,9 @@ class ScreenshotTest {
             if (dom == 14 || dom == 28) add(ago, TxType.EXPENSE, r(300, 650), "fun", t("Кіно", "Cinema"))
             if (dom == 9) add(ago, TxType.EXPENSE, r(1500, 3200), "clothes")
             if (dom == 17) add(ago, TxType.EXPENSE, r(420, 900), "health", t("Аптека", "Pharmacy"))
-            if (dom == 25) add(ago, TxType.INCOME, 38_000.0, "salary", rec = "r_salary")
+            if (dom == 25) add(ago, TxType.INCOME, 23_000.0, "salary", t("Зарплата", "Salary"), rec = "r_salary")
+            if (dom == 10) add(ago, TxType.INCOME, 15_000.0, "salary", t("Аванс", "Advance"), rec = "r_advance")
+            if (dom == 7) add(ago, TxType.TRANSFER, 2_000.0, null, t("Зняв готівку", "Cash withdrawal"), "card", "cash")
             if (dom == 15) add(ago, TxType.INCOME, r(6000, 9000), "side", t("Логотип для кав'ярні", "Logo for a café"))
             if (dom == 1) add(ago, TxType.INCOME, r(150, 260), "cashback")
             if (dom == 26) add(ago, TxType.TRANSFER, 5_000.0, null, t("Відкладаю", "Saving"), "card", "jar")
@@ -205,7 +210,8 @@ class ScreenshotTest {
             Recurring("r_net", TxType.EXPENSE, m(250.0), "card", category = "phone", note = t("Інтернет", "Internet"), start = nextDay(5).toString()),
             Recurring("r_netflix", TxType.EXPENSE, m(279.0), "card", category = "subs", note = "Netflix", start = nextDay(12).toString()),
             Recurring("r_gym", TxType.EXPENSE, m(900.0), "card", category = "sport", note = t("Спортзал", "Gym"), start = today.plusDays(4).toString(), auto = false),
-            Recurring("r_salary", TxType.INCOME, m(38_000.0), "card", category = "salary", note = t("Зарплата", "Salary"), start = nextDay(25).toString()),
+            Recurring("r_salary", TxType.INCOME, m(23_000.0), "card", category = "salary", note = t("Зарплата", "Salary"), start = nextDay(25).toString()),
+            Recurring("r_advance", TxType.INCOME, m(15_000.0), "card", category = "salary", note = t("Аванс", "Advance"), start = nextDay(10).toString()),
             Recurring("r_jar", TxType.TRANSFER, m(5_000.0), "card", toAccount = "jar", note = t("У скарбничку", "To the jar"), start = nextDay(26).toString()),
         )
         val goals = listOf(
@@ -220,7 +226,7 @@ class ScreenshotTest {
             accounts = accounts,
             txs = txs,
             budgets = listOf(
-                Budget("b_all", null, m(32_000.0)),
+                Budget("b_all", null, m(42_000.0)),
                 Budget("b_food", "food", m(9_000.0)),
                 Budget("b_cafe", "cafe", m(2_800.0)),
                 Budget("b_fun", "fun", m(1_000.0)),

@@ -385,7 +385,7 @@ fun RecurringsScreen(d: AppData) {
                         Text(r.note.ifBlank { if (r.type == TxType.TRANSFER) "${d.account(r.account)?.name} → ${d.account(r.toAccount)?.name}" else d.catName(r.category) }, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(
                             if (!r.active) t("вимкнено", "paused")
-                            else L.every(r.every, r.interval) + (next?.let { t(" · наступний ", " · next ") + L.dayTitle(it).replaceFirstChar { c -> c.lowercase(L.locale) } } ?: t(" · завершено", " · ended")) +
+                            else L.every(r.every, r.interval) + (next?.let { t(" · наступний ", " · next ") + shortDay(it) } ?: t(" · завершено", " · ended")) +
                                 if (!r.auto) t(" · нагадування", " · reminder") else "",
                             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2,
                         )
@@ -517,4 +517,10 @@ private fun SwitchRow2(title: String, sub: String, checked: Boolean, onChange: (
         Spacer(Modifier.width(12.dp))
         Switch(checked, onChange)
     }
+}
+
+/** «сьогодні», «завтра» або «5 листопада» — без дня тижня, щоб рядок був коротким. */
+private fun shortDay(d: LocalDate): String {
+    val today = LocalDate.now()
+    return if (d == today || d == today.plusDays(1) || d == today.minusDays(1)) L.dayTitle(d).replaceFirstChar { it.lowercase(L.locale) } else L.date(d)
 }

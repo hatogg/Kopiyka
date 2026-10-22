@@ -90,10 +90,14 @@ private fun Body(context: Context, d: AppData) {
             style = TextStyle(color = muted, fontSize = 12.sp), maxLines = 1,
         )
         if (bs != null) {
+            val ok = bs.left >= 0 && bs.leftToday >= 0
             Text(
-                if (bs.leftToday >= 0) t("Можна ще сьогодні: ", "Left today: ") + Money.format(bs.leftToday, s.base, hide = hide)
-                else t("Понад денний ліміт: ", "Over today's limit: ") + Money.format(-bs.leftToday, s.base, hide = hide),
-                style = TextStyle(color = if (bs.leftToday >= 0) GlanceTheme.colors.primary else GlanceTheme.colors.error, fontSize = 12.sp, fontWeight = FontWeight.Medium),
+                when {
+                    bs.left < 0 -> t("Бюджет перевищено на ", "Budget exceeded by ") + Money.format(-bs.left, s.base, hide = hide)
+                    bs.leftToday < 0 -> t("Понад денний ліміт: ", "Over today's limit: ") + Money.format(-bs.leftToday, s.base, hide = hide)
+                    else -> t("Можна ще сьогодні: ", "Left today: ") + Money.format(bs.leftToday, s.base, hide = hide)
+                },
+                style = TextStyle(color = if (ok) GlanceTheme.colors.primary else GlanceTheme.colors.error, fontSize = 12.sp, fontWeight = FontWeight.Medium),
                 maxLines = 1,
             )
         }
