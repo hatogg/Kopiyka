@@ -157,6 +157,13 @@ fun TxEditor(d: AppData, r: Route.Edit) {
     var confirmDelete by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
+    androidx.compose.runtime.LaunchedEffect(app.newCategory) {
+        val id = app.newCategory ?: return@LaunchedEffect
+        app.newCategory = null
+        val c = Store.data.value.category(id)
+        if (c != null && c.type == type) { category = id; error = null }
+    }
+
     val cur = d.curOf(account)
     val toCur = d.curOf(toAccount)
     val crossCurrency = type == TxType.TRANSFER && toAccount != null && cur != toCur

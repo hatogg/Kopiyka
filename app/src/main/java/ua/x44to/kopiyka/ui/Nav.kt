@@ -59,6 +59,9 @@ class AppState(private val scope: CoroutineScope) {
     /** Обраний період (спільний для операцій, бюджетів і статистики); null — поточний. */
     var periodStart by mutableStateOf<LocalDate?>(null)
     var goalsTab by mutableStateOf(false)
+
+    /** щойно створена з редактора категорія — редактор одразу її вибирає */
+    var newCategory by mutableStateOf<String?>(null)
     val snack = SnackbarHostState()
 
     fun period(monthStart: Int): Period {

@@ -319,7 +319,9 @@ fun CategoryEditScreen(d: AppData, r: Route.CategoryEdit) {
             }
             SaveBar {
                 if (name.isBlank()) { err = true; return@SaveBar }
-                Store.saveCategory((existing ?: Category(Store.newId(), name, type, icon, color)).copy(name = name.trim(), type = type, icon = icon, color = color))
+                val c = (existing ?: Category(Store.newId(), name, type, icon, color)).copy(name = name.trim(), type = type, icon = icon, color = color)
+                Store.saveCategory(c)
+                if (existing == null) app.newCategory = c.id
                 app.pop()
             }
         }
