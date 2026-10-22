@@ -104,6 +104,15 @@ class ScreenshotTest {
                 shot("$lang-light-accounts")
                 compose.onNodeWithContentDescription(t("Назад", "Back")).performClick()
                 settle()
+                // онлайн-курс: застосунок сам підтягує його при запуску
+                last(t("Валюти й курси", "Currencies & rates"))
+                runCatching { waitFor("онлайн-курс", 20_000) { Store.data.value.settings.ratesTime > 0 } }
+                    .onFailure { Log.w("Kopiyka", "online rates didn't arrive: $it") }
+                Log.d("Kopiyka", "rates from ${Store.data.value.settings.ratesFrom}: USD=${Store.data.value.settings.rates["USD"]}")
+                settle()
+                shot("$lang-light-rates")
+                compose.onNodeWithContentDescription(t("Назад", "Back")).performClick()
+                settle()
                 tab(t("Огляд", "Overview"))
                 settle()
             }

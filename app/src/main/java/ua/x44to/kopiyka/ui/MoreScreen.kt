@@ -41,11 +41,16 @@ import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Palette
+import androidx.compose.material.icons.rounded.Public
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Repeat
 import androidx.compose.material.icons.rounded.Restore
 import androidx.compose.material.icons.rounded.TableChart
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -69,6 +74,7 @@ import ua.x44to.kopiyka.data.AppData
 import ua.x44to.kopiyka.data.Calc
 import ua.x44to.kopiyka.data.L
 import ua.x44to.kopiyka.data.Money
+import ua.x44to.kopiyka.data.Rates
 import ua.x44to.kopiyka.data.Store
 import ua.x44to.kopiyka.data.TxType
 import ua.x44to.kopiyka.data.t
@@ -130,7 +136,7 @@ fun MoreScreen(d: AppData, padding: PaddingValues) {
                 )
                 MenuRow(
                     Icons.Rounded.CurrencyExchange, t("Валюти й курси", "Currencies & rates"),
-                    t("Основна: ", "Main: ") + "${Money.symbol(s.base)} ${s.base}", { app.push(Route.Rates) },
+                    t("Основна: ", "Main: ") + "${Money.symbol(s.base)} ${s.base}" + if (s.ratesAuto) " · " + t("онлайн-курс", "online rates") else "", { app.push(Route.Rates) },
                 )
             }
         }
@@ -252,6 +258,7 @@ fun RatesScreen(d: AppData) {
     val s = d.settings
     val used = d.accounts.map { it.currency }.toSet()
     val others = Money.CURRENCIES.map { it.code }.filter { it != s.base }.sortedBy { if (it in used) 0 else 1 }
+    val rs by Store.ratesState.collectAsStateWithLifecycle()
     SubScreen(t("Валюти й курси", "Currencies & rates")) { pad ->
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(top = pad.calculateTopPadding(), bottom = pad.calculateBottomPadding() + 24.dp)) {
             item {
@@ -269,19 +276,70 @@ fun RatesScreen(d: AppData) {
                     Spacer(Modifier.height(4.dp))
                     Text(
                         t(
-                            "Копійка не ходить в інтернет, тож курси вказуєте ви — вони потрібні лише для перерахунку рахунків в інших валютах." +
-                                (s.ratesDate?.let { " Оновлено ${L.date(LocalDate.parse(it))}." } ?: ""),
-                            "Kopiyka never goes online, so you set the rates — they're only used to convert accounts in other currencies." +
-                                (s.ratesDate?.let { " Updated ${L.date(LocalDate.parse(it))}." } ?: ""),
+                            "Потрібні, щоб рахувати валютну готівку й рахунки в загальному балансі та переказах між валютами.",
+                            "Used to count foreign-currency cash and accounts in the total balance and in transfers between currencies.",
                         ),
                         style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Spacer(Modifier.height(8.dp))
                 }
             }
-            items(others, key = { "${s.base}-$it" }) { code -> RateRow(d, code, code in used) }
+            item {
+                SoftCard {
+                    MenuRow(
+                        Icons.Rounded.Public, t("Онлайн-курс", "Online rates"),
+                        if (s.ratesAuto) ratesInfo(s) else t("Вимкнено — курси вписуєте ви", "Off — you enter the rates"),
+                        { Store.settings { it.copy(ratesAuto = !it.ratesAuto) }; if (!s.ratesAuto) Store.refreshRatesAsync(force = true) },
+                    ) {
+                        Switch(s.ratesAuto, { v -> Store.settings { it.copy(ratesAuto = v) }; if (v) Store.refreshRatesAsync(force = true) })
+                    }
+                    if (s.ratesAuto) {
+                        Column(Modifier.padding(start = 64.dp, end = 16.dp, bottom = 12.dp)) {
+                            val src = runCatching { Rates.Source.valueOf(s.ratesSource) }.getOrDefault(Rates.Source.MONO)
+                            Chips(
+                                Rates.Source.entries.toList(), src,
+                                { when (it) { Rates.Source.MONO -> "Monobank"; Rates.Source.NBU -> t("НБУ", "NBU") } },
+                                { v -> Store.settings { it.copy(ratesSource = v.name) }; Store.refreshRatesAsync(force = true) },
+                            )
+                            Text(
+                                when (src) {
+                                    Rates.Source.MONO -> t("Середнє між купівлею й продажем — близько до курсу обмінників.", "The middle of buy and sell — close to exchange offices.")
+                                    Rates.Source.NBU -> t("Офіційний курс Національного банку.", "The official National Bank rate.")
+                                },
+                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(top = 4.dp),
+                            )
+                            Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                OutlinedButton(onClick = { Store.refreshRatesAsync(force = true) }, enabled = !rs.busy) {
+                                    if (rs.busy) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                                    else Icon(Icons.Rounded.Refresh, null, Modifier.size(18.dp))
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(t("Оновити зараз", "Update now"))
+                                }
+                            }
+                            rs.error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 6.dp)) }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(4.dp))
+            }
+            items(others, key = { "${s.base}-$it-${s.ratesAuto}" }) { code -> RateRow(d, code, code in used) }
         }
     }
+}
+
+/** «Monobank · сьогодні о 14:30» */
+fun ratesInfo(s: ua.x44to.kopiyka.data.Settings): String {
+    if (s.ratesTime <= 0) return t("Ще не оновлювались", "Not updated yet")
+    val from = when (s.ratesFrom) { "NBU" -> t("НБУ", "NBU"); "MONO" -> "Monobank"; else -> "" }
+    val dt = java.time.Instant.ofEpochMilli(s.ratesTime).atZone(java.time.ZoneId.systemDefault())
+    val time = "%02d:%02d".format(dt.hour, dt.minute)
+    val day = dt.toLocalDate()
+    val whenText = when (day) {
+        LocalDate.now() -> t("сьогодні о $time", "today at $time")
+        LocalDate.now().minusDays(1) -> t("вчора о $time", "yesterday at $time")
+        else -> L.date(day)
+    }
+    return listOf(from, whenText).filter { it.isNotEmpty() }.joinToString(" · ")
 }
 
 private fun rateText(v: Double): String {
@@ -303,7 +361,14 @@ private fun RateRow(d: AppData, code: String, used: Boolean) {
             "1 ${Money.symbol(code)} $code =", style = MaterialTheme.typography.bodyLarge,
             fontWeight = if (used) FontWeight.SemiBold else FontWeight.Normal, modifier = Modifier.width(120.dp),
         )
-        OutlinedTextField(
+        if (s.ratesAuto) {
+            // онлайн-курс: лише показуємо (щоб змінити вручну — вимкніть «Онлайн-курс»)
+            Text(
+                rateText(rate) + " " + Money.symbol(s.base), style = MaterialTheme.typography.titleMedium,
+                fontWeight = if (used) FontWeight.SemiBold else FontWeight.Normal,
+                modifier = Modifier.weight(1f).padding(vertical = 12.dp, horizontal = 16.dp),
+            )
+        } else OutlinedTextField(
             value = text,
             onValueChange = { v ->
                 text = v.filter { it.isDigit() || it == ',' || it == '.' }

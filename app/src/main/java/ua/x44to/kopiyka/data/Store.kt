@@ -244,9 +244,51 @@ object Store {
         )
     }
 
-    /** Курс «1 [code] = [perBase] основної валюти». Зберігаємо відносно гривні. */
+    // ───────── онлайн-курси ─────────
+
+    class RatesState(val busy: Boolean = false, val error: String? = null)
+
+    private val _rates = MutableStateFlow(RatesState())
+    val ratesState: StateFlow<RatesState> = _rates
+
+    /**
+     * Оновити курси з інтернету (Monobank або НБУ, з запасним джерелом). Блокує — кликати не з головного потоку.
+     * Без [force] оновлює лише коли ввімкнено «онлайн-курс» і останнє оновлення старше 3 годин.
+     */
+    fun refreshRates(force: Boolean = false): Boolean {
+        val s = _data.value.settings
+        if (!force && (!s.ratesAuto || System.currentTimeMillis() - s.ratesTime < 3 * 3600_000L)) return false
+        val pref = runCatching { Rates.Source.valueOf(s.ratesSource) }.getOrDefault(Rates.Source.MONO)
+        val (m, src) = Rates.fetchAny(pref)
+        update { d ->
+            d.copy(
+                settings = d.settings.copy(
+                    rates = d.settings.rates + m, ratesDate = LocalDate.now().toString(),
+                    ratesTime = System.currentTimeMillis(), ratesFrom = src.name,
+                ),
+            )
+        }
+        return true
+    }
+
+    /** Те саме у фоні, зі станом для екрана «Валюти й курси». */
+    fun refreshRatesAsync(force: Boolean = false) {
+        if (_rates.value.busy) return
+        scope.launch(Dispatchers.IO) {
+            _rates.value = RatesState(busy = true)
+            val err = try {
+                refreshRates(force)
+                null
+            } catch (_: Exception) {
+                t("Не вдалося отримати курс — немає інтернету?", "Couldn't get the rates — no internet?")
+            }
+            _rates.value = RatesState(error = err)
+        }
+    }
+
+    /** Курс «1 [code] = [perBase] основної валюти». Зберігаємо відносно гривні. Ручний курс вимикає онлайн-оновлення. */
     fun setRate(code: String, perBase: Double) = update { d ->
-        val s = d.settings
+        val s = d.settings.copy(ratesAuto = false)
         val baseRate = s.rates[s.base] ?: Money.DEFAULT_RATES[s.base] ?: 1.0
         val uah = if (code == "UAH") 1.0 else perBase * baseRate
         if (code == "UAH") {

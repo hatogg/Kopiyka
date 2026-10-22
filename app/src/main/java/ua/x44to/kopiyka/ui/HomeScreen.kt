@@ -133,6 +133,11 @@ fun HomeScreen(d: AppData, padding: PaddingValues) {
                             Spacer(Modifier.height(10.dp))
                             Text(a.name, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Text(Money.format(bal[a.id] ?: 0, a.currency, hide = hide), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                            // валютна готівка: еквівалент в основній валюті за поточним курсом
+                            if (a.currency != d.settings.base && (bal[a.id] ?: 0) != 0L) Text(
+                                "≈ " + Money.format(Money.convert(bal[a.id] ?: 0, a.currency, d.settings.base, d.settings), d.settings.base, hide = hide),
+                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1,
+                            )
                         }
                     }
                 }

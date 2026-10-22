@@ -19,7 +19,8 @@ import java.time.LocalDate
 sealed interface Route {
     data class Edit(val txId: String? = null, val type: TxType = TxType.EXPENSE, val account: String? = null, val toAccount: String? = null) : Route
     data object Accounts : Route
-    data class AccountEdit(val id: String?) : Route
+    /** [cash] — новий рахунок «валютна готівка» в цій валюті */
+    data class AccountEdit(val id: String?, val cash: String? = null) : Route
     data object Categories : Route
     data class CategoryEdit(val id: String?, val type: TxType = TxType.EXPENSE) : Route
     data object Recurrings : Route

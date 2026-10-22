@@ -19,9 +19,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Payments
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Remove
@@ -123,17 +125,25 @@ fun AccountsScreen(d: AppData) {
                     Column(Modifier.padding(vertical = 4.dp)) {
                         active.forEachIndexed { i, a ->
                             if (i > 0) HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                            AccountRow(a, bal[a.id] ?: 0, hide) { app.push(Route.AccountEdit(a.id)) }
+                            AccountRow(a, bal[a.id] ?: 0, hide, s) { app.push(Route.AccountEdit(a.id)) }
                         }
                     }
                 }
             }
             item {
-                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+                Row(
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
                     OutlinedButton(onClick = { app.push(Route.Edit(type = TxType.TRANSFER)) }, enabled = active.size >= 2) {
                         Icon(Icons.Rounded.SwapHoriz, null, Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text(t("Переказ між рахунками", "Transfer between accounts"))
+                        Text(t("Переказ чи обмін", "Transfer or exchange"))
+                    }
+                    OutlinedButton(onClick = { app.push(Route.AccountEdit(null, cash = if (s.base == "USD") "EUR" else "USD")) }) {
+                        Icon(Icons.Rounded.Payments, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(t("Валютна готівка", "Foreign cash"))
                     }
                 }
             }
@@ -142,7 +152,7 @@ fun AccountsScreen(d: AppData) {
                 item {
                     SoftCard {
                         Column(Modifier.padding(vertical = 4.dp)) {
-                            for (a in archived) AccountRow(a, bal[a.id] ?: 0, hide) { app.push(Route.AccountEdit(a.id)) }
+                            for (a in archived) AccountRow(a, bal[a.id] ?: 0, hide, s) { app.push(Route.AccountEdit(a.id)) }
                         }
                     }
                 }
@@ -152,7 +162,7 @@ fun AccountsScreen(d: AppData) {
 }
 
 @Composable
-private fun AccountRow(a: Account, balance: Long, hide: Boolean, onClick: () -> Unit) {
+private fun AccountRow(a: Account, balance: Long, hide: Boolean, s: ua.x44to.kopiyka.data.Settings, onClick: () -> Unit) {
     Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
         Badge(accIcon(a.type), tint(a.color))
         Spacer(Modifier.width(14.dp))
@@ -163,10 +173,17 @@ private fun AccountRow(a: Account, balance: Long, hide: Boolean, onClick: () -> 
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Text(
-            Money.format(balance, a.currency, hide = hide), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold,
-            color = if (balance < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
-        )
+        Column(horizontalAlignment = Alignment.End) {
+            Text(
+                Money.format(balance, a.currency, hide = hide), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold,
+                color = if (balance < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+            )
+            // валюта: скільки це в основній за поточним курсом
+            if (a.currency != s.base && balance != 0L) Text(
+                "≈ " + Money.format(Money.convert(balance, a.currency, s.base, s), s.base, hide = hide),
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 
@@ -175,9 +192,10 @@ fun AccountEditScreen(d: AppData, r: Route.AccountEdit) {
     val app = LocalApp.current
     val existing = remember { d.account(r.id) }
     val balNow = remember { existing?.let { Calc.balances(d)[it.id] } ?: 0L }
-    var name by remember { mutableStateOf(existing?.name ?: "") }
-    var type by remember { mutableStateOf(existing?.type ?: AccType.CARD) }
-    var currency by remember { mutableStateOf(existing?.currency ?: d.settings.base) }
+    val cashName = { c: String -> when (c) { "USD" -> t("Долари", "Dollars"); "EUR" -> t("Євро", "Euros"); "PLN" -> t("Злоті", "Zloty"); "GBP" -> t("Фунти", "Pounds"); else -> t("Готівка", "Cash") + " " + c } }
+    var name by remember { mutableStateOf(existing?.name ?: r.cash?.let(cashName) ?: "") }
+    var type by remember { mutableStateOf(existing?.type ?: if (r.cash != null) AccType.CASH else AccType.CARD) }
+    var currency by remember { mutableStateOf(existing?.currency ?: r.cash ?: d.settings.base) }
     var balText by remember { mutableStateOf(if (balNow == 0L && existing == null) "" else (if (balNow < 0) "-" else "") + Money.plain(kotlin.math.abs(balNow))) }
     var color by remember { mutableStateOf(existing?.color ?: PALETTE[(d.accounts.size * 5) % PALETTE.size]) }
     var inTotal by remember { mutableStateOf(existing?.inTotal ?: true) }
@@ -204,7 +222,19 @@ fun AccountEditScreen(d: AppData, r: Route.AccountEdit) {
                 FieldLabel(t("Тип", "Type"))
                 Chips(AccType.entries.toList(), type, { L.accType(it) }, { type = it }, icon = { accIcon(it) })
                 FieldLabel(t("Валюта", "Currency"))
-                Chips(Money.CURRENCIES.map { it.code }, currency, { "${Money.symbol(it)} $it" }, { currency = it })
+                Chips(Money.CURRENCIES.map { it.code }, currency, { "${Money.symbol(it)} $it" }, { c ->
+                    if (existing == null && name == cashName(currency)) name = cashName(c)
+                    currency = c
+                })
+                if (currency != d.settings.base) {
+                    val s = d.settings
+                    val one = Money.convert(10_000, currency, s.base, s)
+                    Text(
+                        "1 ${Money.symbol(currency)} = ${Money.format(one, s.base, cents = true)}" +
+                            if (s.ratesAuto) " · " + ratesInfo(s) else " · " + t("курс вписано вручну", "manual rate"),
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 if (existing != null && used && currency != existing.currency) Text(
                     t("Суми вже записаних операцій не перераховуються — лише змінюється валюта.", "Existing amounts won't be converted — only the currency label changes."),
                     style = MaterialTheme.typography.bodySmall, color = warnColor,

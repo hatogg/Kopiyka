@@ -78,6 +78,7 @@ object Notify {
         Store.init(c)
         // спільний бюджет: спершу забираємо зміни інших, щоб не додати вже сплачений ними платіж
         if (Sync.active) Sync.syncOnceBlocking()
+        try { Store.refreshRates() } catch (_: Exception) {} // онлайн-курс, якщо давно не оновлювали
         val added = Store.processRecurring()
         val d = Store.data.value
         if (!d.settings.notifications) return

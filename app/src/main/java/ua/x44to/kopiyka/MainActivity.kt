@@ -110,6 +110,7 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         Sync.start() // спільний бюджет: живе з'єднання, поки застосунок на екрані
+        Store.refreshRatesAsync() // онлайн-курс валют, якщо давно не оновлювали
     }
 
     override fun onStop() {

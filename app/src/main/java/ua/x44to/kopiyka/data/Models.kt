@@ -116,6 +116,14 @@ data class Settings(
     /** скільки гривень коштує одиниця валюти (UAH = 1) */
     val rates: Map<String, Double> = Money.DEFAULT_RATES,
     val ratesDate: String? = null,
+    /** брати курси з інтернету (інакше — вписані вручну) */
+    val ratesAuto: Boolean = true,
+    /** бажане джерело: MONO або NBU */
+    val ratesSource: String = "MONO",
+    /** звідки насправді останні курси (якщо бажане джерело не відповіло) */
+    val ratesFrom: String? = null,
+    /** коли оновлено, мс */
+    val ratesTime: Long = 0,
     /** з якого числа починається бюджетний місяць (день зарплати) */
     val monthStart: Int = 1,
     val notifications: Boolean = true,
