@@ -154,8 +154,7 @@ private fun Setup(st: Sync.Status) {
                 busy = t("Створюю спільний бюджет…", "Creating the shared budget…")
                 scope.launch {
                     try {
-                        Sync.create(name)
-                        app.toast(t("Спільний бюджет створено — поділіться кодом", "Shared budget created — share the code"))
+                        Sync.create(name) // екран сам перемкнеться на код — окреме повідомлення не потрібне
                     } catch (e: Exception) {
                         error = failText(e)
                     }
@@ -220,7 +219,6 @@ private fun Setup(st: Sync.Status) {
             scope.launch {
                 try {
                     Sync.join(code, name)
-                    app.toast(t("Готово! Тепер бюджет спільний", "Done! The budget is shared now"))
                 } catch (e: Exception) {
                     error = failText(e)
                 }

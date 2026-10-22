@@ -30,6 +30,12 @@
   <img src="docs/screens/en-light-recurring.png" width="24%" alt="Recurring payments">
   <img src="docs/screens/en-dark-home.png" width="24%" alt="Overview in the dark theme">
 </p>
+<p align="center">
+  <img src="docs/screens/en-light-shared.png" width="24%" alt="Shared budget: code and members">
+  <img src="docs/screens/en-light-shared-history.png" width="24%" alt="Who added a transaction">
+  <img src="docs/screens/en-light-accounts.png" width="24%" alt="Foreign cash in your main currency">
+  <img src="docs/screens/en-light-rates.png" width="24%" alt="Online exchange rates">
+</p>
 
 <sub>Real screenshots: GitHub Actions runs the app in an Android 14 emulator and walks through the screens with demo data.</sub>
 

@@ -30,6 +30,12 @@
   <img src="docs/screens/uk-light-recurring.png" width="24%" alt="Регулярні платежі">
   <img src="docs/screens/uk-dark-home.png" width="24%" alt="Огляд у темній темі">
 </p>
+<p align="center">
+  <img src="docs/screens/uk-light-shared.png" width="24%" alt="Спільний бюджет: код і учасники">
+  <img src="docs/screens/uk-light-shared-history.png" width="24%" alt="Хто додав операцію">
+  <img src="docs/screens/uk-light-accounts.png" width="24%" alt="Валютна готівка в гривнях">
+  <img src="docs/screens/uk-light-rates.png" width="24%" alt="Онлайн-курс валют">
+</p>
 
 <sub>Справжні скриншоти: GitHub Actions запускає застосунок в емуляторі Android 14 і проходить екрани з демо-даними.</sub>
 
