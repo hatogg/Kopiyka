@@ -7,6 +7,7 @@ import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.performImeAction
+import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.isSelectable
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
@@ -172,6 +173,7 @@ class ScreenshotTest {
     private fun sharedFlow(lang: String) {
         last(t("Спільний бюджет", "Shared budget"))
         settle()
+        compose.onAllNodes(hasSetTextAction()).onFirst().performTextClearance()
         compose.onAllNodes(hasSetTextAction()).onFirst().performTextInput(t("Оля", "Olivia"))
         compose.onAllNodes(hasSetTextAction()).onFirst().performImeAction()
         settle()
@@ -202,6 +204,7 @@ class ScreenshotTest {
             val mine = Tx("mine-${System.currentTimeMillis()}", TxType.EXPENSE, if (L.ukr) 9_500 else 450, "card", category = "cafe", date = LocalDate.now().toString(), by = Sync.author())
             Store.saveTx(mine)
             partner.listenFor(20_000) { partner.data.txs.any { it.id == mine.id } }
+            Thread.sleep(3500) // хай зникне повідомлення «бюджет створено»
             settle()
             shot("$lang-light-shared")
             compose.onNodeWithContentDescription(t("Назад", "Back")).performClick()
